@@ -1,4 +1,3 @@
-// screens/Instagram.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -10,12 +9,16 @@ import {
   useColorScheme,
   Dimensions,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import {
   fetchInstaVideoData,
   fetchYoutubeVideoData,
 } from "@/constants/apiCalls";
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
 import { Feather } from "@expo/vector-icons";
 
 const { width, height } = Dimensions.get("window");
@@ -26,6 +29,7 @@ export default function Instagram() {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoDetails, setVideoDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const theme = useColorScheme();
   const isDark = theme === "dark";
@@ -33,16 +37,54 @@ export default function Instagram() {
   const fetchVideo = async () => {
     setIsLoading(true);
     const data = await fetchYoutubeVideoData(url);
-    console.log(data.data.media[0].url);
-    if (data) {
-      setVideoUrl(data.data.media[0].url);
+    if (data?.data?.media) {
+      // console.log(data.data.media);
+      setVideoUrl(data.data.media[0]?.url);
       setVideoDetails(data.data);
+    } else {
+      Alert.alert("Error", "Could not fetch video. Please check the URL.");
     }
     setIsLoading(false);
   };
 
+  const downloadVideo = async () => {
+    try {
+      setDownloading(true);
+
+      // Ask for permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Cannot save video without permission."
+        );
+        return;
+      }
+
+      const fileUri = FileSystem.documentDirectory + "youtube_video.mp4";
+      const downloadResumable = FileSystem.createDownloadResumable(
+        videoUrl,
+        fileUri
+      );
+
+      const { uri } = await downloadResumable.downloadAsync();
+
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      await MediaLibrary.createAlbumAsync("Downloads", asset, false);
+
+      Alert.alert("Downloaded", "Video saved to Downloads.");
+    } catch (error) {
+      console.error("Download error:", error);
+      Alert.alert("Error", "Failed to download video.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const player = useVideoPlayer(videoUrl, (video) => {
-    video.play();
+    if (showVideo) {
+      video.play();
+    }
   });
 
   return (
@@ -53,7 +95,7 @@ export default function Instagram() {
       ]}
     >
       <Text style={[styles.title, { color: isDark ? "white" : "black" }]}>
-        Youtube Downloader
+        YouTube Downloader
       </Text>
 
       <TextInput
@@ -86,15 +128,7 @@ export default function Instagram() {
           <Image
             source={{ uri: videoDetails.thumbnail }}
             resizeMode="contain"
-            style={[
-              styles.thumbnail,
-              {
-                width: width * 0.9,
-                height: height * 0.5,
-                marginTop: height * 0.05,
-                borderRadius: 16,
-              },
-            ]}
+            style={styles.thumbnail}
           />
           <Feather
             name="play-circle"
@@ -105,15 +139,30 @@ export default function Instagram() {
         </TouchableOpacity>
       )}
 
-      {showVideo && <VideoView player={player} style={styles.video} />}
-      <Text
-        style={[
-          styles.title,
-          { color: isDark ? "white" : "black", fontSize: 18, marginTop: 20 },
-        ]}
-      >
-        {videoDetails?.title}
-      </Text>
+      {showVideo && (
+        <>
+          <VideoView player={player} style={styles.video} />
+          <TouchableOpacity
+            style={styles.downloadButton}
+            onPress={downloadVideo}
+          >
+            {downloading ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.downloadButtonText}>Download Video</Text>
+            )}
+          </TouchableOpacity>
+        </>
+      )}
+      {!showVideo && videoUrl && (
+        <TouchableOpacity style={styles.downloadButton} onPress={downloadVideo}>
+          {downloading ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <Text style={styles.downloadButtonText}>Download Video</Text>
+          )}
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -159,8 +208,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   thumbnail: {
-    width: "100%",
-    height: "100%",
+    width: width * 0.9,
+    height: height * 0.55,
     borderRadius: 16,
   },
   playIcon: {
@@ -170,7 +219,20 @@ const styles = StyleSheet.create({
   },
   video: {
     width: width * 0.9,
-    height: height * 0.5,
+    height: height * 0.4,
     borderRadius: 16,
+    marginTop: 20,
+  },
+  downloadButton: {
+    backgroundColor: "#3CB371",
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  downloadButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

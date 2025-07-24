@@ -19,4 +19,13 @@ export const fetchYoutubeVideoData = async (url) => {
     } catch (error) {
         console.log(error);
     }
-}   
+}
+
+export const fetchYoutubeToMp3Data = async (url) => {
+    try {
+        const { data } = await axios.get(`${API_URL}/api/download/yt-audio?url=${url}`);
+        return data;
+    } catch (error) {
+        console.log(error);
+    }
+}

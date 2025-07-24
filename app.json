@@ -34,12 +34,22 @@
           "data": [
             {
               "scheme": "https",
-              "host": "*.youtube.com",
+              "host": "www.youtube.com",
               "pathPrefix": "/"
             },
             {
               "scheme": "https",
-              "host": "*.instagram.com",
+              "host": "youtube.com",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.instagram.com",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "instagram.com",
               "pathPrefix": "/"
             }
           ],
@@ -63,9 +73,7 @@
         "projectId": "5bb40107-e20d-4df8-914f-9aedbb361dbb"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/5bb40107-e20d-4df8-914f-9aedbb361dbb"
     }

@@ -31,11 +31,17 @@
       </intent-filter>
       <intent-filter data-generated="true">
         <action android:name="android.intent.action.VIEW"/>
-        <data android:scheme="https" android:host="*.youtube.com" android:pathPrefix="/"/>
-        <data android:scheme="https" android:host="*.instagram.com" android:pathPrefix="/"/>
-        <data android:scheme="exp+insta-tube-dl"/>
+        <data android:scheme="https" android:host="www.youtube.com" android:pathPrefix="/"/>
+        <data android:scheme="https" android:host="youtube.com" android:pathPrefix="/"/>
+        <data android:scheme="https" android:host="www.instagram.com" android:pathPrefix="/"/>
+        <data android:scheme="https" android:host="instagram.com" android:pathPrefix="/"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.SEND"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:mimeType="text/plain"/>
       </intent-filter>
     </activity>
   </application>

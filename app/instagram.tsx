@@ -68,7 +68,7 @@ export default function Instagram() {
       const asset = await MediaLibrary.createAssetAsync(uri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
 
-      Alert.alert("Downloaded", "Video saved to Downloads.");
+      Alert.alert("Downloaded", "Video saved to Pictures/Downloads.");
     } catch (error) {
       console.error("Download error:", error);
       Alert.alert("Error", "Failed to download video.");
@@ -78,7 +78,9 @@ export default function Instagram() {
   };
 
   const player = useVideoPlayer(videoUrl, (video) => {
-    video.play();
+    if (showVideo) {
+      video.play();
+    }
   });
 
   return (
@@ -148,6 +150,15 @@ export default function Instagram() {
           </TouchableOpacity>
         </>
       )}
+      {!showVideo && videoUrl && (
+        <TouchableOpacity style={styles.downloadButton} onPress={downloadVideo}>
+          {downloading ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <Text style={styles.downloadButtonText}>Download Video</Text>
+          )}
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -193,8 +204,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   thumbnail: {
-    width: "100%",
-    height: "100%",
+    width: width * 0.9,
+    height: height * 0.5,
     borderRadius: 16,
   },
   playIcon: {
