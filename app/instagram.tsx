@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,13 +10,13 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
-  Platform,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { fetchInstaVideoData } from "@/constants/apiCalls";
+import { Feather } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
-import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 
 const { width, height } = Dimensions.get("window");
 
@@ -26,54 +26,40 @@ export default function Instagram() {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoDetails, setVideoDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [hasPermission, requestPermission] = MediaLibrary.usePermissions();
 
   const theme = useColorScheme();
   const isDark = theme === "dark";
 
-  const fetchVideo = async () => {
-    setIsLoading(true);
-    const data = await fetchInstaVideoData(url);
-    if (data?.data?.media) {
-      setVideoUrl(data.data.media);
-      setVideoDetails(data.data);
-    } else {
-      Alert.alert("Error", "Could not fetch video. Please check the URL.");
+  const params = useLocalSearchParams();
+
+  useEffect(() => {
+    if (params?.url && typeof params.url === "string") {
+      setUrl(params.url);
+      fetchVideo(params.url);
     }
-    setIsLoading(false);
-  };
+  }, [params]);
 
-  const downloadVideo = async () => {
+  const fetchVideo = async (passedUrl?: string) => {
     try {
-      setDownloading(true);
-
-      // Ask for permissions
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== "granted") {
+      setIsLoading(true);
+      const inputUrl = passedUrl || url;
+      const data = await fetchInstaVideoData(inputUrl);
+      if (data?.data?.media) {
+        setVideoUrl(data.data.media);
+        setVideoDetails(data.data);
+        setShowVideo(false);
+      } else {
         Alert.alert(
-          "Permission Denied",
-          "Cannot save video without permission."
+          "Error",
+          "Unable to fetch video. Make sure the URL is valid."
         );
-        return;
       }
-
-      const fileUri = FileSystem.documentDirectory + "insta_video.mp4";
-      const downloadResumable = FileSystem.createDownloadResumable(
-        videoUrl,
-        fileUri
-      );
-
-      const { uri } = await downloadResumable.downloadAsync();
-
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      await MediaLibrary.createAlbumAsync("Downloads", asset, false);
-
-      Alert.alert("Downloaded", "Video saved to Pictures/Downloads.");
-    } catch (error) {
-      console.error("Download error:", error);
-      Alert.alert("Error", "Failed to download video.");
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Something went wrong.");
     } finally {
-      setDownloading(false);
+      setIsLoading(false);
     }
   };
 
@@ -82,6 +68,38 @@ export default function Instagram() {
       video.play();
     }
   });
+
+  const downloadVideo = async () => {
+    try {
+      if (!videoUrl) return;
+
+      if (!hasPermission?.granted) {
+        const { granted } = await requestPermission();
+        if (!granted) {
+          Alert.alert(
+            "Permission required",
+            "Storage permission is needed to save the video."
+          );
+          return;
+        }
+      }
+
+      const fileUri = FileSystem.documentDirectory + "insta_video.mp4";
+      const downloadResumable = FileSystem.createDownloadResumable(
+        videoUrl,
+        fileUri
+      );
+      const { uri } = await downloadResumable.downloadAsync();
+
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      await MediaLibrary.createAlbumAsync("Downloads", asset, false);
+
+      Alert.alert("Success", "Video saved to Pictures/Downloads!");
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Failed to download video.");
+    }
+  };
 
   return (
     <View
@@ -108,7 +126,7 @@ export default function Instagram() {
         onChangeText={setUrl}
       />
 
-      <TouchableOpacity style={styles.button} onPress={fetchVideo}>
+      <TouchableOpacity style={styles.button} onPress={() => fetchVideo()}>
         {isLoading ? (
           <ActivityIndicator color="white" size="small" />
         ) : (
@@ -124,7 +142,15 @@ export default function Instagram() {
           <Image
             source={{ uri: videoDetails.thumbnail }}
             resizeMode="contain"
-            style={styles.thumbnail}
+            style={[
+              styles.thumbnail,
+              {
+                width: width * 0.9,
+                height: height * 0.5,
+                marginTop: height * 0.05,
+                borderRadius: 16,
+              },
+            ]}
           />
           <Feather
             name="play-circle"
@@ -135,28 +161,14 @@ export default function Instagram() {
         </TouchableOpacity>
       )}
 
-      {showVideo && (
-        <>
-          <VideoView player={player} style={styles.video} />
-          <TouchableOpacity
-            style={styles.downloadButton}
-            onPress={downloadVideo}
-          >
-            {downloading ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <Text style={styles.downloadButtonText}>Download Video</Text>
-            )}
-          </TouchableOpacity>
-        </>
-      )}
-      {!showVideo && videoUrl && (
-        <TouchableOpacity style={styles.downloadButton} onPress={downloadVideo}>
-          {downloading ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text style={styles.downloadButtonText}>Download Video</Text>
-          )}
+      {showVideo && <VideoView player={player} style={styles.video} />}
+
+      {videoUrl && (
+        <TouchableOpacity
+          onPress={downloadVideo}
+          style={[styles.button, { marginTop: 10 }]}
+        >
+          <Text style={styles.buttonText}>Download</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -188,7 +200,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     borderRadius: 12,
     alignItems: "center",
-    marginBottom: 30,
   },
   buttonText: {
     color: "white",
@@ -217,18 +228,5 @@ const styles = StyleSheet.create({
     width: width * 0.9,
     height: height * 0.5,
     borderRadius: 16,
-    marginTop: 20,
-  },
-  downloadButton: {
-    backgroundColor: "#3CB371",
-    paddingVertical: 12,
-    paddingHorizontal: 40,
-    borderRadius: 12,
-    marginTop: 20,
-  },
-  downloadButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
   },
 });

@@ -17,7 +17,7 @@ import * as Linking from "expo-linking";
 export { ErrorBoundary } from "expo-router";
 
 export const unstable_settings = {
-  initialRouteName: "(tabs)",
+  initialRouteName: "(drawer)",
 };
 
 SplashScreen.preventAutoHideAsync();

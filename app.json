@@ -15,11 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.arunonwork.InstaTubeDL",
       "associatedDomains": [
         "applinks:youtube.com",
+        "applinks:www.youtube.com",
         "applinks:instagram.com",
-        "applinks:youtube.com",
-        "applinks:instagram.com"
+        "applinks:www.instagram.com"
       ]
     },
     "android": {
@@ -28,10 +29,16 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
+      "package": "com.arunonwork.InstaTubeDL",
       "intentFilters": [
         {
           "action": "VIEW",
           "data": [
+            {
+              "scheme": "https",
+              "host": "youtube.com",
+              "pathPrefix": "/"
+            },
             {
               "scheme": "https",
               "host": "www.youtube.com",
@@ -39,7 +46,12 @@
             },
             {
               "scheme": "https",
-              "host": "youtube.com",
+              "host": "youtu.be",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "instagram.com",
               "pathPrefix": "/"
             },
             {
@@ -48,15 +60,20 @@
               "pathPrefix": "/"
             },
             {
-              "scheme": "https",
-              "host": "instagram.com",
-              "pathPrefix": "/"
+              "scheme": "instatubedl"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": ["BROWSABLE", "DEFAULT"],
+          "autoVerify": true
+        },
+        {
+          "action": "SEND",
+          "category": ["DEFAULT"],
+          "data": {
+            "mimeType": "text/plain"
+          }
         }
-      ],
-      "package": "com.arunonwork.InstaTubeDL"
+      ]
     },
     "web": {
       "bundler": "metro",

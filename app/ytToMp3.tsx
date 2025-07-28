@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,61 +10,83 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
-  Platform,
 } from "react-native";
-import { VideoView, useVideoPlayer } from "expo-video";
-import {
-  fetchInstaVideoData,
-  fetchYoutubeToMp3Data,
-  fetchYoutubeVideoData,
-} from "@/constants/apiCalls";
+import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import { Feather } from "@expo/vector-icons";
+import { fetchYoutubeToMp3Data } from "@/constants/apiCalls";
 
 const { width, height } = Dimensions.get("window");
 
-export default function Instagram() {
+export default function YouTubeToMp3Screen() {
   const [url, setUrl] = useState("");
-  const [showVideo, setShowVideo] = useState(false);
-  const [videoUrl, setVideoUrl] = useState("");
-  const [videoDetails, setVideoDetails] = useState(null);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [audioDetails, setAudioDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const theme = useColorScheme();
   const isDark = theme === "dark";
 
-  const fetchVideo = async () => {
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  const fetchAudio = async () => {
     setIsLoading(true);
-    const data = await fetchYoutubeToMp3Data(url);
-    if (data?.data?.media) {
-      // console.log(data.data.media);
-      setVideoUrl(data.data.media[0]?.url);
-      setVideoDetails(data.data);
-    } else {
-      Alert.alert("Error", "Could not fetch video. Please check the URL.");
+    try {
+      const data = await fetchYoutubeToMp3Data(url);
+      if (data?.data?.media) {
+        const audioLink = data.data.media[0]?.url;
+        setAudioUrl(audioLink);
+        setAudioDetails(data.data);
+
+        // unload previous audio if any
+        if (soundRef.current) {
+          await soundRef.current.unloadAsync();
+          soundRef.current = null;
+        }
+
+        // load new audio
+        const { sound } = await Audio.Sound.createAsync({ uri: audioLink });
+        soundRef.current = sound;
+      } else {
+        Alert.alert("Error", "Could not fetch audio. Please check the URL.");
+      }
+    } catch (err) {
+      Alert.alert("Error", "Something went wrong while fetching.");
     }
     setIsLoading(false);
   };
 
-  const downloadVideo = async () => {
+  const toggleAudio = async () => {
+    if (!soundRef.current) return;
+
+    if (isPlaying) {
+      await soundRef.current.pauseAsync();
+      setIsPlaying(false);
+    } else {
+      await soundRef.current.playAsync();
+      setIsPlaying(true);
+    }
+  };
+
+  const downloadAudio = async () => {
     try {
       setDownloading(true);
 
-      // Ask for permissions
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permission Denied",
-          "Cannot save video without permission."
+          "Cannot save audio without permission."
         );
         return;
       }
 
-      const fileUri = FileSystem.documentDirectory + "yt_to_mp3.mp3";
+      const fileUri = FileSystem.documentDirectory + "youtube_audio.mp3";
       const downloadResumable = FileSystem.createDownloadResumable(
-        videoUrl,
+        audioUrl,
         fileUri
       );
 
@@ -73,20 +95,22 @@ export default function Instagram() {
       const asset = await MediaLibrary.createAssetAsync(uri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
 
-      Alert.alert("Downloaded", "Video saved to Downloads.");
+      Alert.alert("Downloaded", "Audio saved to Downloads.");
     } catch (error) {
       console.error("Download error:", error);
-      Alert.alert("Error", "Failed to download video.");
+      Alert.alert("Error", "Failed to download audio.");
     } finally {
       setDownloading(false);
     }
   };
 
-  const player = useVideoPlayer(videoUrl, (video) => {
-    if (showVideo) {
-      video.play();
-    }
-  });
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
 
   return (
     <View
@@ -107,66 +131,67 @@ export default function Instagram() {
             color: isDark ? "white" : "black",
           },
         ]}
-        placeholder="Paste Instagram URL"
+        placeholder="Paste YouTube URL"
         placeholderTextColor={isDark ? "#aaa" : "#555"}
         value={url}
         onChangeText={setUrl}
       />
 
-      <TouchableOpacity style={styles.button} onPress={fetchVideo}>
+      <TouchableOpacity style={styles.button} onPress={fetchAudio}>
         {isLoading ? (
           <ActivityIndicator color="white" size="small" />
         ) : (
-          <Text style={styles.buttonText}>Fetch Video</Text>
+          <Text style={styles.buttonText}>Fetch Audio</Text>
         )}
       </TouchableOpacity>
 
-      {videoDetails?.thumbnail && !showVideo && (
-        <TouchableOpacity
-          onPress={() => setShowVideo(true)}
-          style={styles.thumbnailWrapper}
-        >
+      {audioDetails?.thumbnail && (
+        <View style={styles.thumbnailWrapper}>
           <Image
-            source={{ uri: videoDetails.thumbnail }}
+            source={{ uri: audioDetails.thumbnail }}
             resizeMode="contain"
             style={styles.thumbnail}
           />
           <Feather
-            name="play-circle"
-            size={64}
+            name="music"
+            size={48}
             color="lightblue"
             style={styles.playIcon}
           />
-        </TouchableOpacity>
+        </View>
       )}
 
-      {showVideo && (
+      {audioUrl && (
         <>
-          <VideoView player={player} style={styles.video} />
+          <TouchableOpacity
+            style={styles.audioControlButton}
+            onPress={toggleAudio}
+          >
+            <Feather
+              name={isPlaying ? "pause-circle" : "play-circle"}
+              size={32}
+              color="white"
+            />
+            <Text style={styles.audioControlText}>
+              {isPlaying ? "Pause" : "Play"} Preview
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.downloadButton}
-            onPress={downloadVideo}
+            onPress={downloadAudio}
           >
             {downloading ? (
               <ActivityIndicator color="white" size="small" />
             ) : (
-              <Text style={styles.downloadButtonText}>Download Video</Text>
+              <Text style={styles.downloadButtonText}>Download Audio</Text>
             )}
           </TouchableOpacity>
         </>
       )}
-      {!showVideo && videoUrl && (
-        <TouchableOpacity style={styles.downloadButton} onPress={downloadVideo}>
-          {downloading ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text style={styles.downloadButtonText}>Download Video</Text>
-          )}
-        </TouchableOpacity>
-      )}
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -203,33 +228,42 @@ const styles = StyleSheet.create({
   thumbnailWrapper: {
     position: "relative",
     width: width * 0.9,
-    height: height * 0.5,
+    height: height * 0.45,
     borderRadius: 16,
     overflow: "hidden",
     marginBottom: 20,
+    justifyContent: "center",
+    alignItems: "center",
   },
   thumbnail: {
     width: width * 0.9,
-    height: height * 0.55,
+    height: height * 0.45,
     borderRadius: 16,
   },
   playIcon: {
     position: "absolute",
-    top: "50%",
-    left: "40%",
   },
-  video: {
-    width: width * 0.9,
-    height: height * 0.4,
-    borderRadius: 16,
-    marginTop: 20,
+  audioControlButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 20,
+    backgroundColor: "#444",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  audioControlText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   downloadButton: {
     backgroundColor: "#3CB371",
     paddingVertical: 12,
     paddingHorizontal: 40,
     borderRadius: 12,
-    marginTop: 20,
+    marginTop: 10,
   },
   downloadButtonText: {
     color: "white",

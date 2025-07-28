@@ -37,7 +37,7 @@ export default function HomeScreen() {
       <Text
         style={[styles.title, { color: theme === "dark" ? "white" : "black" }]}
       >
-        Video Downloader
+        Insta-Tube-DL
       </Text>
       {logos.map((item) => (
         <TouchableOpacity
