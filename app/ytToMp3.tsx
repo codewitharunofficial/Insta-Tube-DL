@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,63 +11,62 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { Audio } from "expo-av";
+import { useAudioPlayer } from "expo-audio"; // Use expo-audio hook
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import { Feather } from "@expo/vector-icons";
 import { fetchYoutubeToMp3Data } from "@/constants/apiCalls";
+import { useLocalSearchParams } from "expo-router";
 
 const { width, height } = Dimensions.get("window");
 
 export default function YouTubeToMp3Screen() {
-  const [url, setUrl] = useState("");
+  const { url: sharedUrl } = useLocalSearchParams(); // Get URL from navigation params
+  const [url, setUrl] = useState(sharedUrl || "");
   const [audioUrl, setAudioUrl] = useState("");
   const [audioDetails, setAudioDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const player = useAudioPlayer(audioUrl ? { uri: audioUrl } : null); // Initialize player with audio URL
 
   const theme = useColorScheme();
   const isDark = theme === "dark";
 
-  const soundRef = useRef<Audio.Sound | null>(null);
-
-  const fetchAudio = async () => {
+  const fetchAudio = async (inputUrl: string) => {
     setIsLoading(true);
     try {
-      const data = await fetchYoutubeToMp3Data(url);
+      const data = await fetchYoutubeToMp3Data(inputUrl);
       if (data?.data?.media) {
-        const audioLink = data.data.media[0]?.url;
+        // console.log("Fetched audio data:", data);
+        const audioLink = data.data.media?.url;
         setAudioUrl(audioLink);
         setAudioDetails(data.data);
-
-        // unload previous audio if any
-        if (soundRef.current) {
-          await soundRef.current.unloadAsync();
-          soundRef.current = null;
-        }
-
-        // load new audio
-        const { sound } = await Audio.Sound.createAsync({ uri: audioLink });
-        soundRef.current = sound;
       } else {
         Alert.alert("Error", "Could not fetch audio. Please check the URL.");
       }
     } catch (err) {
+      console.log("Fetch error:", err);
       Alert.alert("Error", "Something went wrong while fetching.");
     }
     setIsLoading(false);
   };
 
-  const toggleAudio = async () => {
-    if (!soundRef.current) return;
+  // Automatically fetch audio if shared URL is provided
+  useEffect(() => {
+    if (sharedUrl && typeof sharedUrl === "string") {
+      console.log("Shared URL received in YouTubeToMp3Screen:", sharedUrl);
+      setUrl(sharedUrl);
+      fetchAudio(sharedUrl);
+    }
+  }, [sharedUrl]);
 
-    if (isPlaying) {
-      await soundRef.current.pauseAsync();
-      setIsPlaying(false);
+  const toggleAudio = async () => {
+    if (!player.isLoaded) return;
+
+    if (player.playing) {
+      await player.pause();
     } else {
-      await soundRef.current.playAsync();
-      setIsPlaying(true);
+      await player.play();
     }
   };
 
@@ -85,7 +84,7 @@ export default function YouTubeToMp3Screen() {
       }
 
       const fileUri = FileSystem.documentDirectory + "youtube_audio.mp3";
-      const downloadResumable = FileSystem.createDownloadResumable(
+      const downloadResumable = await FileSystem.createDownloadResumable(
         audioUrl,
         fileUri
       );
@@ -103,14 +102,6 @@ export default function YouTubeToMp3Screen() {
       setDownloading(false);
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
-  }, []);
 
   return (
     <View
@@ -137,7 +128,7 @@ export default function YouTubeToMp3Screen() {
         onChangeText={setUrl}
       />
 
-      <TouchableOpacity style={styles.button} onPress={fetchAudio}>
+      <TouchableOpacity style={styles.button} onPress={() => fetchAudio(url)}>
         {isLoading ? (
           <ActivityIndicator color="white" size="small" />
         ) : (
@@ -152,31 +143,24 @@ export default function YouTubeToMp3Screen() {
             resizeMode="contain"
             style={styles.thumbnail}
           />
-          <Feather
-            name="music"
-            size={48}
-            color="lightblue"
-            style={styles.playIcon}
-          />
+          <TouchableOpacity
+            style={[styles.audioControlButton, styles.playIcon]}
+            onPress={toggleAudio}
+          >
+            {player.playing ? (
+              <Feather name={"pause-circle"} size={32} color="white" />
+            ) : (
+              <Feather name={"play-circle"} size={32} color="white" />
+            )}
+            <Text style={styles.audioControlText}>
+              {player.playing ? "Pause" : "Play"} Preview
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 
       {audioUrl && (
         <>
-          <TouchableOpacity
-            style={styles.audioControlButton}
-            onPress={toggleAudio}
-          >
-            <Feather
-              name={isPlaying ? "pause-circle" : "play-circle"}
-              size={32}
-              color="white"
-            />
-            <Text style={styles.audioControlText}>
-              {isPlaying ? "Pause" : "Play"} Preview
-            </Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.downloadButton}
             onPress={downloadAudio}
@@ -191,7 +175,7 @@ export default function YouTubeToMp3Screen() {
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {

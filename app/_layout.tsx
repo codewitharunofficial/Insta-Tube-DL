@@ -1,47 +1,15 @@
-import FontAwesome from "@expo/vector-icons/FontAwesome";
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
-import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
-import { Drawer } from "expo-router/drawer";
-import "react-native-reanimated";
-import { useColorScheme } from "@/components/useColorScheme";
-import { useRouter } from "expo-router";
 import * as Linking from "expo-linking";
-
-export { ErrorBoundary } from "expo-router";
+import { Platform, ToastAndroid } from "react-native";
+import { useRouter } from "expo-router";
+import { useEffect } from "react";
+import { ThemeProvider } from "@react-navigation/native";
+import { useColorScheme } from "@/components/useColorScheme";
+import { DarkTheme, DefaultTheme } from "@react-navigation/native";
+import { Stack } from "expo-router";
 
 export const unstable_settings = {
   initialRouteName: "(drawer)",
 };
-
-SplashScreen.preventAutoHideAsync();
-
-export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
-    ...FontAwesome.font,
-  });
-
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) return null;
-
-  return <RootLayoutNav />;
-}
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
@@ -49,58 +17,92 @@ function RootLayoutNav() {
 
   useEffect(() => {
     const handleDeepLink = (event: { url: string }) => {
+      console.log("Received URL:", event.url);
+      if (Platform.OS === "android") {
+        ToastAndroid.show(`Url: ${event.url}`, ToastAndroid.LONG);
+      }
       const { hostname, path, queryParams } = Linking.parse(event.url);
+      console.log("Parsed URL:", { hostname, path, queryParams });
 
-      const sharedUrl = event.url;
+      const sharedUrl = event.url.toLowerCase();
 
-      if (sharedUrl.includes("youtube.com") || sharedUrl.includes("youtu.be")) {
+      if (
+        sharedUrl.includes("youtube.com") ||
+        sharedUrl.includes("youtu.be") ||
+        sharedUrl.includes("m.youtube.com")
+      ) {
+        console.log("Navigating to YouTube screen with URL:", sharedUrl);
         router.push({ pathname: "/youtube", params: { url: sharedUrl } });
       } else if (sharedUrl.includes("instagram.com")) {
+        console.log("Navigating to Instagram screen with URL:", sharedUrl);
         router.push({ pathname: "/instagram", params: { url: sharedUrl } });
+      } else {
+        console.log("Unhandled URL:", sharedUrl);
       }
     };
 
+    // Add event listener for deep links
     const subscription = Linking.addEventListener("url", handleDeepLink);
 
-    // Also handle initial URL (cold start)
+    // Handle initial URL or shared text (cold start)
     (async () => {
       const initialUrl = await Linking.getInitialURL();
+      console.log("Initial URL:", initialUrl);
+      if (Platform.OS === "android") {
+        ToastAndroid.show(`Url: ${initialUrl}`, ToastAndroid.LONG);
+      }
+
       if (initialUrl) {
         handleDeepLink({ url: initialUrl });
+      } else if (Platform.OS === "android") {
+        // Android: Check for shared text via Intent
+        try {
+          const intentUrl = await Linking.getInitialURL();
+          if (intentUrl) {
+            console.log("Android Intent URL:", intentUrl);
+            handleDeepLink({ url: intentUrl });
+          }
+        } catch (error) {
+          console.log("Error getting Android intent:", error);
+        }
+      } else if (Platform.OS === "ios") {
+        // iOS: Fallback to checking share sheet data
+        try {
+          const url = await Linking.getInitialURL();
+          if (url) {
+            console.log("iOS Shared URL:", url);
+            handleDeepLink({ url });
+          }
+        } catch (error) {
+          console.log("Error getting iOS shared data:", error);
+        }
       }
     })();
 
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [router]);
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <Stack>
-        <Drawer.Screen name="(drawer)" options={{ headerShown: false }} />
+        <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
         <Stack.Screen
           name="instagram"
-          options={{
-            title: "Instagram Downloader",
-            headerShown: true,
-          }}
+          options={{ title: "Instagram Downloader", headerShown: true }}
         />
         <Stack.Screen
           name="youtube"
-          options={{
-            title: "YouTube Downloader",
-            headerShown: true,
-          }}
+          options={{ title: "YouTube Downloader", headerShown: true }}
         />
         <Stack.Screen
           name="ytToMp3"
-          options={{
-            title: "YouTube to MP3",
-            headerShown: true,
-          }}
+          options={{ title: "YouTube to MP3", headerShown: true }}
         />
       </Stack>
     </ThemeProvider>
   );
 }
+
+export default RootLayoutNav;
