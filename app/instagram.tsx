@@ -10,6 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { fetchInstaVideoData } from "@/constants/apiCalls";
@@ -73,28 +74,39 @@ export default function Instagram() {
     try {
       if (!videoUrl) return;
 
-      if (!hasPermission?.granted) {
-        const { granted } = await requestPermission();
-        if (!granted) {
-          Alert.alert(
-            "Permission required",
-            "Storage permission is needed to save the video."
-          );
-          return;
+      if (Platform.OS === "web") {
+        const a = document.createElement("a");
+        a.href = videoUrl;
+        a.download = "insta_video.mp4";
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        alert("Download started in your browser.");
+      } else {
+        if (!hasPermission?.granted) {
+          const { granted } = await requestPermission();
+          if (!granted) {
+            Alert.alert(
+              "Permission required",
+              "Storage permission is needed to save the video."
+            );
+            return;
+          }
         }
+
+        const fileUri = FileSystem.documentDirectory + "insta_video.mp4";
+        const downloadResumable = FileSystem.createDownloadResumable(
+          videoUrl,
+          fileUri
+        );
+        const { uri } = await downloadResumable.downloadAsync();
+
+        const asset = await MediaLibrary.createAssetAsync(uri);
+        await MediaLibrary.createAlbumAsync("Downloads", asset, false);
+
+        Alert.alert("Success", "Video saved to Pictures/Downloads!");
       }
-
-      const fileUri = FileSystem.documentDirectory + "insta_video.mp4";
-      const downloadResumable = FileSystem.createDownloadResumable(
-        videoUrl,
-        fileUri
-      );
-      const { uri } = await downloadResumable.downloadAsync();
-
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      await MediaLibrary.createAlbumAsync("Downloads", asset, false);
-
-      Alert.alert("Success", "Video saved to Pictures/Downloads!");
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Failed to download video.");

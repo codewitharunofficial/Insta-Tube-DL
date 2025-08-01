@@ -16,7 +16,7 @@
     },
     "preview": {
       "android": {
-        "buildType": "apk",
+        "buildType": "app-bundle",
         "channel": "preview",
         "gradleCommand": ":app:assembleRelease"
       },
@@ -34,8 +34,12 @@
           "EXPO_PUBLIC_API_URL": "https://insta-tube-dl.vercel.app"
         }
       },
-
       "channel": "production"
+    },
+    "web": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://insta-tube-dl.vercel.app"
+      }
     }
   },
   "submit": {

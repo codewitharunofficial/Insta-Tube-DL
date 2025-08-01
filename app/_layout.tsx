@@ -1,5 +1,5 @@
 import * as Linking from "expo-linking";
-import { Platform, ToastAndroid } from "react-native";
+import { Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { ThemeProvider } from "@react-navigation/native";
@@ -18,9 +18,7 @@ function RootLayoutNav() {
   useEffect(() => {
     const handleDeepLink = (event: { url: string }) => {
       console.log("Received URL:", event.url);
-      if (Platform.OS === "android") {
-        ToastAndroid.show(`Url: ${event.url}`, ToastAndroid.LONG);
-      }
+
       const { hostname, path, queryParams } = Linking.parse(event.url);
       console.log("Parsed URL:", { hostname, path, queryParams });
 
@@ -48,9 +46,6 @@ function RootLayoutNav() {
     (async () => {
       const initialUrl = await Linking.getInitialURL();
       console.log("Initial URL:", initialUrl);
-      if (Platform.OS === "android") {
-        ToastAndroid.show(`Url: ${initialUrl}`, ToastAndroid.LONG);
-      }
 
       if (initialUrl) {
         handleDeepLink({ url: initialUrl });

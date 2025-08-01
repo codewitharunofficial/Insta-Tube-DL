@@ -10,6 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { useAudioPlayer } from "expo-audio"; // Use expo-audio hook
 import * as FileSystem from "expo-file-system";
@@ -74,27 +75,41 @@ export default function YouTubeToMp3Screen() {
     try {
       setDownloading(true);
 
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Denied",
-          "Cannot save audio without permission."
+      if (Platform.OS === "web") {
+        // Web download via anchor tag
+        const link = document.createElement("a");
+        link.href = audioUrl;
+        link.download = "youtube_audio.mp3";
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        Alert.alert("Download Started", "Your download should begin shortly.");
+      } else {
+        // Native download using Expo APIs
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Permission Denied",
+            "Cannot save audio without permission."
+          );
+          return;
+        }
+
+        const fileUri = FileSystem.documentDirectory + "youtube_audio.mp3";
+        const downloadResumable = await FileSystem.createDownloadResumable(
+          audioUrl,
+          fileUri
         );
-        return;
+
+        const { uri } = await downloadResumable.downloadAsync();
+
+        const asset = await MediaLibrary.createAssetAsync(uri);
+        await MediaLibrary.createAlbumAsync("Downloads", asset, false);
+
+        Alert.alert("Downloaded", "Audio saved to Downloads.");
       }
-
-      const fileUri = FileSystem.documentDirectory + "youtube_audio.mp3";
-      const downloadResumable = await FileSystem.createDownloadResumable(
-        audioUrl,
-        fileUri
-      );
-
-      const { uri } = await downloadResumable.downloadAsync();
-
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      await MediaLibrary.createAlbumAsync("Downloads", asset, false);
-
-      Alert.alert("Downloaded", "Audio saved to Downloads.");
     } catch (error) {
       console.error("Download error:", error);
       Alert.alert("Error", "Failed to download audio.");
