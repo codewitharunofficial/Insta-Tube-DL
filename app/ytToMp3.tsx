@@ -11,51 +11,45 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  ScrollView,
 } from "react-native";
-import { useAudioPlayer } from "expo-audio"; // Use expo-audio hook
+import { useAudioPlayer } from "expo-audio";
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import { Feather } from "@expo/vector-icons";
 import { fetchYoutubeToMp3Data } from "@/constants/apiCalls";
 import { useLocalSearchParams } from "expo-router";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 export default function YouTubeToMp3Screen() {
-  const { url: sharedUrl } = useLocalSearchParams(); // Get URL from navigation params
+  const { url: sharedUrl } = useLocalSearchParams();
   const [url, setUrl] = useState(sharedUrl || "");
   const [audioUrl, setAudioUrl] = useState("");
   const [audioDetails, setAudioDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const player = useAudioPlayer(audioUrl ? { uri: audioUrl } : null); // Initialize player with audio URL
+  const player = useAudioPlayer(audioUrl ? { uri: audioUrl } : null);
+  const isDark = useColorScheme() === "dark";
 
-  const theme = useColorScheme();
-  const isDark = theme === "dark";
-
-  const fetchAudio = async (inputUrl: string) => {
+  const fetchAudio = async (inputUrl) => {
     setIsLoading(true);
     try {
       const data = await fetchYoutubeToMp3Data(inputUrl);
       if (data?.data?.media) {
-        // console.log("Fetched audio data:", data);
-        const audioLink = data.data.media?.url;
-        setAudioUrl(audioLink);
+        setAudioUrl(data.data.media.url);
         setAudioDetails(data.data);
       } else {
         Alert.alert("Error", "Could not fetch audio. Please check the URL.");
       }
-    } catch (err) {
-      console.log("Fetch error:", err);
+    } catch {
       Alert.alert("Error", "Something went wrong while fetching.");
     }
     setIsLoading(false);
   };
 
-  // Automatically fetch audio if shared URL is provided
   useEffect(() => {
     if (sharedUrl && typeof sharedUrl === "string") {
-      console.log("Shared URL received in YouTubeToMp3Screen:", sharedUrl);
       setUrl(sharedUrl);
       fetchAudio(sharedUrl);
     }
@@ -63,12 +57,7 @@ export default function YouTubeToMp3Screen() {
 
   const toggleAudio = async () => {
     if (!player.isLoaded) return;
-
-    if (player.playing) {
-      await player.pause();
-    } else {
-      await player.play();
-    }
+    player.playing ? await player.pause() : await player.play();
   };
 
   const downloadAudio = async () => {
@@ -76,42 +65,41 @@ export default function YouTubeToMp3Screen() {
       setDownloading(true);
 
       if (Platform.OS === "web") {
-        // Web download via anchor tag
         const link = document.createElement("a");
         link.href = audioUrl;
-        link.download = "youtube_audio.mp3";
-        link.target = "_blank";
+
+        // Safari fallback → just open in new tab
+        if (/^((?!chrome|android).)*safari/i.test(navigator.userAgent)) {
+          link.target = "_blank";
+        } else {
+          link.download = `${audioDetails.title}.mp3`;
+        }
+
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
 
-        Alert.alert("Download Started", "Your download should begin shortly.");
-      } else {
-        // Native download using Expo APIs
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert(
-            "Permission Denied",
-            "Cannot save audio without permission."
-          );
-          return;
-        }
-
-        const fileUri = FileSystem.documentDirectory + "youtube_audio.mp3";
-        const downloadResumable = await FileSystem.createDownloadResumable(
-          audioUrl,
-          fileUri
-        );
-
-        const { uri } = await downloadResumable.downloadAsync();
-
-        const asset = await MediaLibrary.createAssetAsync(uri);
-        await MediaLibrary.createAlbumAsync("Downloads", asset, false);
-
-        Alert.alert("Downloaded", "Audio saved to Downloads.");
+        setDownloading(false);
+        return;
       }
+
+      // Native
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Cannot save audio without permission."
+        );
+        return;
+      }
+
+      const fileUri = FileSystem.documentDirectory + "youtube_audio.mp3";
+      const { uri } = await FileSystem.downloadAsync(audioUrl, fileUri);
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      await MediaLibrary.createAlbumAsync("Downloads", asset, false);
+
+      Alert.alert("Downloaded", "Audio saved to Downloads.");
     } catch (error) {
-      console.error("Download error:", error);
       Alert.alert("Error", "Failed to download audio.");
     } finally {
       setDownloading(false);
@@ -119,154 +107,131 @@ export default function YouTubeToMp3Screen() {
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: isDark ? "#121212" : "#fff" },
-      ]}
+    <ScrollView
+      style={{ flex: 1, backgroundColor: isDark ? "#121212" : "#fff" }}
+      contentContainerStyle={{ padding: 20 }}
     >
       <Text style={[styles.title, { color: isDark ? "white" : "black" }]}>
-        YouTube To MP3 Downloader
+        🎵 YouTube to MP3
       </Text>
 
-      <TextInput
+      <View
         style={[
-          styles.input,
-          {
-            backgroundColor: isDark ? "#1f1f1f" : "#f0f0f0",
-            color: isDark ? "white" : "black",
-          },
+          styles.card,
+          { backgroundColor: isDark ? "#1f1f1f" : "#f9f9f9" },
         ]}
-        placeholder="Paste YouTube URL"
-        placeholderTextColor={isDark ? "#aaa" : "#555"}
-        value={url}
-        onChangeText={setUrl}
-      />
-
-      <TouchableOpacity style={styles.button} onPress={() => fetchAudio(url)}>
-        {isLoading ? (
-          <ActivityIndicator color="white" size="small" />
-        ) : (
-          <Text style={styles.buttonText}>Fetch Audio</Text>
-        )}
-      </TouchableOpacity>
+      >
+        <TextInput
+          style={[styles.input, { color: isDark ? "white" : "black" }]}
+          placeholder="Paste YouTube URL"
+          placeholderTextColor={isDark ? "#aaa" : "#555"}
+          value={url}
+          onChangeText={setUrl}
+        />
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => fetchAudio(url)}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Feather name="search" size={18} color="white" />
+          )}
+          <Text style={styles.btnText}>Fetch</Text>
+        </TouchableOpacity>
+      </View>
 
       {audioDetails?.thumbnail && (
-        <View style={styles.thumbnailWrapper}>
+        <View style={styles.previewCard}>
           <Image
             source={{ uri: audioDetails.thumbnail }}
-            resizeMode="contain"
             style={styles.thumbnail}
           />
-          <TouchableOpacity
-            style={[styles.audioControlButton, styles.playIcon]}
-            onPress={toggleAudio}
-          >
-            {player.playing ? (
-              <Feather name={"pause-circle"} size={32} color="white" />
-            ) : (
-              <Feather name={"play-circle"} size={32} color="white" />
-            )}
-            <Text style={styles.audioControlText}>
-              {player.playing ? "Pause" : "Play"} Preview
-            </Text>
+          <TouchableOpacity style={styles.playBtn} onPress={toggleAudio}>
+            <Feather
+              name={player.playing ? "pause" : "play"}
+              size={28}
+              color="white"
+            />
           </TouchableOpacity>
+          <Text style={styles.songTitle}>{audioDetails.title}</Text>
         </View>
       )}
 
       {audioUrl && (
-        <>
-          <TouchableOpacity
-            style={styles.downloadButton}
-            onPress={downloadAudio}
-          >
-            {downloading ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <Text style={styles.downloadButtonText}>Download Audio</Text>
-            )}
-          </TouchableOpacity>
-        </>
+        <TouchableOpacity style={styles.downloadBtn} onPress={downloadAudio}>
+          {downloading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Feather name="download" size={18} color="white" />
+          )}
+          <Text style={styles.btnText}>Download MP3</Text>
+        </TouchableOpacity>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    alignItems: "center",
-  },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
+    textAlign: "center",
   },
-  input: {
-    width: "100%",
-    borderRadius: 12,
+  card: {
+    borderRadius: 14,
     padding: 14,
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: "#FF3C5F",
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 12,
-    alignItems: "center",
-    marginBottom: 30,
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  thumbnailWrapper: {
-    position: "relative",
-    width: width * 0.9,
-    height: height * 0.45,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  thumbnail: {
-    width: width * 0.9,
-    height: height * 0.45,
-    borderRadius: 16,
-  },
-  playIcon: {
-    position: "absolute",
-  },
-  audioControlButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 20,
-    backgroundColor: "#444",
+    elevation: 2,
+  },
+  input: { flex: 1, fontSize: 16 },
+  actionBtn: {
+    backgroundColor: "#FF3C5F",
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  audioControlText: {
+  btnText: { color: "white", fontWeight: "600", fontSize: 15 },
+  previewCard: {
+    marginTop: 20,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: "#000",
+    alignItems: "center",
+    position: "relative",
+  },
+  thumbnail: { width: width - 40, height: 200 },
+  playBtn: {
+    position: "absolute",
+    top: "40%",
+    left: "45%",
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 50,
+    padding: 8,
+  },
+  songTitle: {
     color: "white",
-    fontSize: 16,
+    padding: 10,
     fontWeight: "bold",
+    fontSize: 16,
+    textAlign: "center",
+    backgroundColor: "#222",
+    width: "100%",
   },
-  downloadButton: {
+  downloadBtn: {
+    marginTop: 20,
     backgroundColor: "#3CB371",
     paddingVertical: 12,
-    paddingHorizontal: 40,
     borderRadius: 12,
-    marginTop: 10,
-  },
-  downloadButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
   },
 });
