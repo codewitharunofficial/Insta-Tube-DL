@@ -15,7 +15,7 @@ import {
 import { VideoView, useVideoPlayer } from "expo-video";
 import { fetchInstaVideoData } from "@/constants/apiCalls";
 import { Feather } from "@expo/vector-icons";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import { useLocalSearchParams } from "expo-router";
 
@@ -27,6 +27,7 @@ export default function Instagram() {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoDetails, setVideoDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [hasPermission, requestPermission] = MediaLibrary.usePermissions();
 
   const theme = useColorScheme();
@@ -73,7 +74,7 @@ export default function Instagram() {
   const downloadVideo = async () => {
     try {
       if (!videoUrl) return;
-
+      setIsDownloading(true);
       if (Platform.OS === "web") {
         const a = document.createElement("a");
         a.href = videoUrl;
@@ -104,12 +105,14 @@ export default function Instagram() {
 
         const asset = await MediaLibrary.createAssetAsync(uri);
         await MediaLibrary.createAlbumAsync("Downloads", asset, false);
-
-        Alert.alert("Success", "Video saved to Pictures/Downloads!");
+        setIsDownloading(false);
+        Alert.alert("Success", "Video saved successfully");
       }
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Failed to download video.");
+        setIsDownloading(false);
+
     }
   };
 
@@ -178,9 +181,14 @@ export default function Instagram() {
       {videoUrl && (
         <TouchableOpacity
           onPress={downloadVideo}
-          style={[styles.button, { marginTop: 10 }]}
+          style={[styles.button, { marginTop: 10, flexDirection: 'row', gap: 3 }]}
         >
-          <Text style={styles.buttonText}>Download</Text>
+          {
+            isDownloading && (
+              <ActivityIndicator size={"small"} color={"#fff"} />
+            )
+          }
+          <Text style={styles.buttonText}>{isDownloading ? "Downloading..." : "Download"}</Text>
         </TouchableOpacity>
       )}
     </View>

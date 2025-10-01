@@ -13,10 +13,10 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { useAudioPlayer } from "expo-audio";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import { Feather } from "@expo/vector-icons";
+import * as Progress from "react-native-progress";
 import { fetchYoutubeToMp3Data } from "@/constants/apiCalls";
 import { useLocalSearchParams } from "expo-router";
 
@@ -29,10 +29,10 @@ export default function YouTubeToMp3Screen() {
   const [audioDetails, setAudioDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const player = useAudioPlayer(audioUrl ? { uri: audioUrl } : null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const isDark = useColorScheme() === "dark";
 
-  const fetchAudio = async (inputUrl) => {
+  const fetchAudio = async (inputUrl : string) => {
     setIsLoading(true);
     try {
       const data = await fetchYoutubeToMp3Data(inputUrl);
@@ -55,20 +55,16 @@ export default function YouTubeToMp3Screen() {
     }
   }, [sharedUrl]);
 
-  const toggleAudio = async () => {
-    if (!player.isLoaded) return;
-    player.playing ? await player.pause() : await player.play();
-  };
-
   const downloadAudio = async () => {
     try {
       setDownloading(true);
+      setDownloadProgress(0);
 
       if (Platform.OS === "web") {
+        // Web download: no progress tracking due to browser limitations
         const link = document.createElement("a");
         link.href = audioUrl;
 
-        // Safari fallback → just open in new tab
         if (/^((?!chrome|android).)*safari/i.test(navigator.userAgent)) {
           link.target = "_blank";
         } else {
@@ -83,19 +79,28 @@ export default function YouTubeToMp3Screen() {
         return;
       }
 
-      // Native
+      // Native download with progress
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permission Denied",
           "Cannot save audio without permission."
         );
+        setDownloading(false);
         return;
       }
 
-      const fileUri = FileSystem.documentDirectory + "youtube_audio.mp3";
-      const { uri } = await FileSystem.downloadAsync(audioUrl, fileUri);
-      const asset = await MediaLibrary.createAssetAsync(uri);
+      const fileUri = FileSystem.documentDirectory + `${audioDetails.title}.mp3`;
+      await FileSystem.downloadAsync(audioUrl, fileUri, {
+        progressCallback: (downloadProgressData) => {
+          const progress =
+            downloadProgressData.totalBytesWritten /
+            downloadProgressData.totalBytesExpectedToWrite;
+          setDownloadProgress(progress);
+        },
+      });
+
+      const asset = await MediaLibrary.createAssetAsync(fileUri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
 
       Alert.alert("Downloaded", "Audio saved to Downloads.");
@@ -103,6 +108,7 @@ export default function YouTubeToMp3Screen() {
       Alert.alert("Error", "Failed to download audio.");
     } finally {
       setDownloading(false);
+      setDownloadProgress(0);
     }
   };
 
@@ -147,26 +153,43 @@ export default function YouTubeToMp3Screen() {
             source={{ uri: audioDetails.thumbnail }}
             style={styles.thumbnail}
           />
-          <TouchableOpacity style={styles.playBtn} onPress={toggleAudio}>
-            <Feather
-              name={player.playing ? "pause" : "play"}
-              size={28}
-              color="white"
-            />
-          </TouchableOpacity>
           <Text style={styles.songTitle}>{audioDetails.title}</Text>
         </View>
       )}
 
       {audioUrl && (
-        <TouchableOpacity style={styles.downloadBtn} onPress={downloadAudio}>
-          {downloading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Feather name="download" size={18} color="white" />
+        <View style={{ marginTop: 20 }}>
+          <TouchableOpacity
+            style={styles.downloadBtn}
+            onPress={downloadAudio}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Feather name="download" size={18} color="white" />
+            )}
+            <Text style={styles.btnText}>
+              {Platform.OS === "web" ? "Download MP3" : downloading ? "Downloading..." : "Download MP3"}
+            </Text>
+          </TouchableOpacity>
+          {downloading && Platform.OS !== "web" && (
+            <View style={styles.progressContainer}>
+              <Progress.Bar
+                progress={downloadProgress}
+                width={width - 40}
+                color="#3CB371"
+                unfilledColor={isDark ? "#444" : "#ddd"}
+                borderWidth={0}
+                height={8}
+                style={{ marginTop: 10 }}
+              />
+              <Text style={[styles.progressText, { color: isDark ? "white" : "black" }]}>
+                {Math.round(downloadProgress * 100)}%
+              </Text>
+            </View>
           )}
-          <Text style={styles.btnText}>Download MP3</Text>
-        </TouchableOpacity>
+        </View>
       )}
     </ScrollView>
   );
@@ -225,7 +248,6 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   downloadBtn: {
-    marginTop: 20,
     backgroundColor: "#3CB371",
     paddingVertical: 12,
     borderRadius: 12,
@@ -233,5 +255,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
+  },
+  progressContainer: {
+    alignItems: "center",
+    marginTop: 10,
+  },
+  progressText: {
+    marginTop: 5,
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

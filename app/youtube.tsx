@@ -18,7 +18,7 @@ import {
   fetchInstaVideoData,
   fetchYoutubeVideoData,
 } from "@/constants/apiCalls";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import { Feather } from "@expo/vector-icons";
 
@@ -101,7 +101,7 @@ export default function Instagram() {
       const asset = await MediaLibrary.createAssetAsync(uri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
 
-      Alert.alert("Success", "Video saved to Pictures/Downloads!");
+      Alert.alert("Success", "Video saved successfully!");
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Failed to download video.");
