@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     left: "40%",
   },
   video: {
-    width: width * 0.9,
+    width: Platform.OS === "web" ? "30%" : width * 0.9,
     height: height * 0.4,
     borderRadius: 16,
     marginTop: 20,
