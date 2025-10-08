@@ -19,14 +19,15 @@ import { Feather } from "@expo/vector-icons";
 import * as Progress from "react-native-progress";
 import { fetchYoutubeToMp3Data } from "@/constants/apiCalls";
 import { useLocalSearchParams } from "expo-router";
+import { Video } from "@/constants/types";
 
 const { width } = Dimensions.get("window");
 
 export default function YouTubeToMp3Screen() {
   const { url: sharedUrl } = useLocalSearchParams();
-  const [url, setUrl] = useState(sharedUrl || "");
-  const [audioUrl, setAudioUrl] = useState("");
-  const [audioDetails, setAudioDetails] = useState(null);
+  const [url, setUrl] = useState<string | undefined>(undefined);
+  const [audioUrl, setAudioUrl] = useState<string>("");
+  const [audioDetails, setAudioDetails] = useState<Video | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -68,7 +69,7 @@ export default function YouTubeToMp3Screen() {
         if (/^((?!chrome|android).)*safari/i.test(navigator.userAgent)) {
           link.target = "_blank";
         } else {
-          link.download = `${audioDetails.title}.mp3`;
+          link.download = `${audioDetails?.title}.mp3`;
         }
 
         document.body.appendChild(link);
@@ -90,15 +91,21 @@ export default function YouTubeToMp3Screen() {
         return;
       }
 
-      const fileUri = FileSystem.documentDirectory + `${audioDetails.title}.mp3`;
-      await FileSystem.downloadAsync(audioUrl, fileUri, {
-        progressCallback: (downloadProgressData) => {
+      const fileUri = FileSystem.documentDirectory + `${audioDetails?.title}.mp3`;
+
+      const downloadResumable = FileSystem.createDownloadResumable(
+        audioUrl,
+        fileUri,
+        {},
+        (downloadProgressData: FileSystem.DownloadProgressData) => {
           const progress =
             downloadProgressData.totalBytesWritten /
             downloadProgressData.totalBytesExpectedToWrite;
           setDownloadProgress(progress);
-        },
-      });
+        }
+      );
+
+      await downloadResumable.downloadAsync();
 
       const asset = await MediaLibrary.createAssetAsync(fileUri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
@@ -136,7 +143,7 @@ export default function YouTubeToMp3Screen() {
         />
         <TouchableOpacity
           style={styles.actionBtn}
-          onPress={() => fetchAudio(url)}
+          onPress={() => fetchAudio(url ?? "")}
         >
           {isLoading ? (
             <ActivityIndicator color="white" />

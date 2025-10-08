@@ -21,6 +21,7 @@ import {
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import { Feather } from "@expo/vector-icons";
+import { Video } from "@/constants/types";
 
 const { width, height } = Dimensions.get("window");
 
@@ -28,7 +29,7 @@ export default function Instagram() {
   const [url, setUrl] = useState("");
   const [showVideo, setShowVideo] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
-  const [videoDetails, setVideoDetails] = useState<any>(null);
+  const [videoDetails, setVideoDetails] = useState<Video | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -97,7 +98,7 @@ export default function Instagram() {
         }
       );
 
-      const { uri } = await downloadResumable.downloadAsync();
+      const { uri }: any = await downloadResumable.downloadAsync();
       const asset = await MediaLibrary.createAssetAsync(uri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
 

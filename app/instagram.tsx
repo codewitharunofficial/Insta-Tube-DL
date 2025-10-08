@@ -18,14 +18,17 @@ import { Feather } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as MediaLibrary from "expo-media-library";
 import { useLocalSearchParams } from "expo-router";
+import { Video } from "@/constants/types";
 
 const { width, height } = Dimensions.get("window");
 
 export default function Instagram() {
+
+
   const [url, setUrl] = useState("");
   const [showVideo, setShowVideo] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
-  const [videoDetails, setVideoDetails] = useState(null);
+  const [videoDetails, setVideoDetails] = useState<Video | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [hasPermission, requestPermission] = MediaLibrary.usePermissions();
@@ -101,7 +104,7 @@ export default function Instagram() {
           videoUrl,
           fileUri
         );
-        const { uri } = await downloadResumable.downloadAsync();
+        const { uri }: any = await downloadResumable.downloadAsync();
 
         const asset = await MediaLibrary.createAssetAsync(uri);
         await MediaLibrary.createAlbumAsync("Downloads", asset, false);
@@ -111,7 +114,7 @@ export default function Instagram() {
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Failed to download video.");
-        setIsDownloading(false);
+      setIsDownloading(false);
 
     }
   };

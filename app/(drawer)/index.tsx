@@ -7,25 +7,35 @@ import {
   Image,
   useColorScheme,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { RelativePathString, useRouter } from "expo-router";
 
-const logos = [
+type Item = {
+  name: string;
+  screen: RelativePathString;
+  icon: any;
+}
+
+const logos: Array<Item> = [
   {
     name: "Instagram",
-    screen: "instagram",
+    screen: "instagram" as RelativePathString,
     icon: require("@/assets/images/insta.png"),
   },
   {
     name: "YouTube",
-    screen: "youtube",
+    screen: "youtube" as RelativePathString,
     icon: require("@/assets/images/youtube.png"),
   },
   {
     name: "YT to MP3",
-    screen: "ytToMp3",
+    screen: "ytToMp3" as RelativePathString,
     icon: require("@/assets/images/mp3.png"),
   },
 ];
+
+
+
+
 
 export default function HomeScreen() {
   const router = useRouter();
